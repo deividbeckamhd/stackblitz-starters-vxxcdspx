@@ -1,0 +1,946 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Caja TPV - Supermercados Dia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;600;700;800&display=swap');
+    
+    .font-mono-tpv { font-family: 'Share Tech Mono', monospace; }
+    
+    .btn-key {
+      transition: all 0.08s ease;
+      user-select: none;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.4);
+      border-radius: 4px;
+      font-weight: 700;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      line-height: 1.1;
+      padding: 4px;
+      cursor: pointer;
+    }
+    .btn-key:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.3);
+    }
+    
+    .key-yellow { background-color: #eab308; color: #1c1917; }
+    .key-yellow:hover { background-color: #facc15; }
+    .key-gray { background-color: #52525b; color: #ffffff; }
+    .key-gray:hover { background-color: #71717a; }
+    .key-num { background-color: #d4d4d8; color: #18181b; font-size: 1.25rem; }
+    .key-num:hover { background-color: #e4e4e7; }
+    .key-red { background-color: #dc2626; color: #ffffff; }
+    .key-red:hover { background-color: #ef4444; }
+    .key-blue { background-color: #2563eb; color: #ffffff; }
+    .key-blue:hover { background-color: #3b82f6; }
+    .key-green { background-color: #16a34a; color: #ffffff; }
+    .key-green:hover { background-color: #22c55e; }
+    .key-pink { background-color: #ec4899; color: #ffffff; }
+    .key-pink:hover { background-color: #f472b6; }
+    
+    .scan-line {
+      height: 2px;
+      background: rgba(239, 68, 68, 0.8);
+      box-shadow: 0 0 8px #ef4444;
+      animation: scan 1.5s infinite linear;
+    }
+    @keyframes scan {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(120px); }
+      100% { transform: translateY(0); }
+    }
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #0f172a; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex flex-col select-none">
+
+  <!-- ENCABEZADO PRINCIPAL -->
+  <header class="bg-red-700 text-white px-4 py-2 flex flex-wrap justify-between items-center shadow-md border-b-2 border-red-800">
+    <div class="flex items-center space-x-3">
+      <div class="bg-white text-red-700 font-extrabold px-2 py-0.5 rounded text-xl tracking-tighter">Dia</div>
+      <h1 class="text-lg font-bold tracking-wide">Simulador de Caja TPV</h1>
+    </div>
+
+    <!-- Controles centrales -->
+    <div class="flex items-center space-x-4 text-sm font-semibold">
+      <div class="flex items-center space-x-2 bg-red-800 px-3 py-1 rounded-md border border-red-600">
+        <label for="modo-teclado" class="text-red-200">Modo Teclado:</label>
+        <select id="modo-teclado" onchange="cambiarModoTeclado(this.value)" class="bg-slate-800 text-white px-2 py-1 rounded text-xs focus:outline-none focus:ring-2 focus:ring-amber-400">
+          <option value="nuevo">Nuevo (Táctil / Imagen 1)</option>
+          <option value="antiguo">Antiguo (Matricial / Imagen 2)</option>
+        </select>
+      </div>
+
+      <button onclick="nuevoCliente()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1 rounded-md shadow transition flex items-center gap-1 text-xs uppercase tracking-wider">
+        <span>🔄 Siguiente Cliente</span>
+      </button>
+    </div>
+
+    <!-- Estadísticas -->
+    <div id="stats" class="text-xs bg-slate-950/60 px-3 py-1 rounded border border-slate-700 font-mono text-amber-400">
+      Clientes: 0 | Puntos: 0 | Errores: 0
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 max-w-[1700px] w-full mx-auto">
+    
+    <!-- COLUMNA IZQUIERDA: CLIENTE Y CINTA -->
+    <section class="lg:col-span-4 flex flex-col gap-3">
+      
+      <!-- Cliente y Bocadillo -->
+      <div class="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-2xl" id="avatar-cliente">👤</span>
+          <div>
+            <h3 class="font-bold text-amber-400 text-sm leading-tight" id="nombre-cliente">Cargando cliente...</h3>
+            <p class="text-xs text-slate-400" id="estado-cliente">Esperando productos</p>
+          </div>
+        </div>
+        <div id="bocadillo" class="bg-amber-100 text-slate-900 border-2 border-amber-400 rounded-xl p-2.5 text-xs font-medium relative shadow-inner min-h-[46px] flex items-center">
+          ¡Hola! Voy a dejar las cosas en la cinta.
+        </div>
+      </div>
+
+      <!-- Cinta Transportadora -->
+      <div class="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-lg flex-1 flex flex-col">
+        <div class="flex justify-between items-center mb-2">
+          <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
+            <span>🛒 Cinta Transportadora</span>
+            <span class="text-[10px] text-slate-400 font-normal">(Haz clic para escanear)</span>
+          </h2>
+          <span id="cant-restante" class="text-xs bg-slate-700 px-2 py-0.5 rounded text-amber-300 font-mono">0 art.</span>
+        </div>
+
+        <div class="relative bg-slate-950 border border-slate-800 rounded-md p-2 flex-1 min-h-[140px] overflow-hidden">
+          <div class="scan-line absolute inset-x-0 top-0 pointer-events-none z-10"></div>
+          <div id="cinta" class="flex flex-wrap gap-2 justify-start items-start relative z-0 h-full overflow-y-auto custom-scroll pr-1">
+            <!-- Productos -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla PLU de Báscula (Frutas y Verduras) -->
+      <div class="bg-slate-800 border border-slate-700 rounded-lg p-2.5 shadow-lg">
+        <h3 class="text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider flex items-center justify-between">
+          <span>⚖️ Códigos PLU Fruta y Verdura</span>
+          <span class="text-[10px] text-amber-400 font-normal">Pulsa PLU + Código</span>
+        </h3>
+        <div class="overflow-x-auto">
+          <table id="tabla-plu" class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400 font-mono">
+                <th class="py-1 px-1">PLU</th>
+                <th class="py-1 px-1">Artículo</th>
+                <th class="py-1 px-1 text-right">Precio/kg</th>
+              </tr>
+            </thead>
+            <tbody id="cuerpo-plu" class="divide-y divide-slate-800 font-mono text-slate-200">
+              <!-- Filas PLU -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUMNA CENTRAL: PANTALLA TPV DIA -->
+    <section class="lg:col-span-4 flex flex-col gap-3">
+      <div class="bg-slate-950 border-4 border-slate-800 rounded-lg p-3 shadow-2xl flex-1 flex flex-col">
+        
+        <!-- Encabezado TPV Dia -->
+        <div class="bg-blue-950 border-b border-blue-900 px-3 py-1.5 flex justify-between items-center text-xs font-mono text-blue-200">
+          <span>POS-DIA v4.2</span>
+          <span id="tpv-hora">--:--:--</span>
+          <span id="tpv-cajero">CAJERO: 042</span>
+        </div>
+
+        <!-- Visor de líneas de Ticket -->
+        <div id="pantalla-tpv" class="flex-1 bg-blue-950/80 font-mono-tpv text-blue-100 p-3 overflow-y-auto custom-scroll flex flex-col gap-1 min-h-[260px] text-sm border-b border-blue-900">
+          <div class="text-slate-400 text-xs italic text-center py-4">Esperando escaneo de artículos...</div>
+        </div>
+
+        <!-- Subtotal y Total -->
+        <div class="bg-slate-900 px-3 py-2 border-b border-slate-800 flex justify-between items-end font-mono-tpv">
+          <div class="text-xs text-slate-400">
+            <div>LINEAS: <span id="num-lineas" class="text-white">0</span></div>
+            <div>DESC. CLUB: <span id="val-descuento" class="text-emerald-400">0,00 €</span></div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-slate-400">TOTAL A PAGAR</div>
+            <div id="total-tpv" class="text-3xl font-extrabold text-amber-400 tracking-tight">0,00 €</div>
+          </div>
+        </div>
+
+        <!-- Display digital del Teclado / Entradas -->
+        <div class="mt-2 bg-black border-2 border-slate-700 rounded p-2 text-right font-mono-tpv">
+          <div id="display-info" class="text-xs text-amber-500 min-h-[16px] truncate">ESPERANDO OPERACIÓN</div>
+          <div id="display-num" class="text-2xl font-bold text-green-400 min-h-[32px] tracking-widest"></div>
+        </div>
+
+        <!-- Visor de mensajes del sistema -->
+        <div id="msg-sistema" class="mt-2 p-2 rounded text-xs font-semibold min-h-[36px] flex items-center justify-between border bg-slate-900 border-slate-800 text-slate-300">
+          <span>Listo para trabajar.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUMNA DERECHA: TECLADO REAL DE DIA (Mapeado exacto de las fotos) -->
+    <section class="lg:col-span-4 flex flex-col gap-2">
+      <div class="bg-slate-800 border border-slate-700 rounded-lg p-2.5 shadow-lg flex-1 flex flex-col justify-between">
+        
+        <div class="flex justify-between items-center mb-1">
+          <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider" id="titulo-teclado">Teclado Dia (Sistema Nuevo)</h2>
+          <span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded font-mono">Teclado POS</span>
+        </div>
+
+        <!-- GRID DEL TECLADO -->
+        <div id="teclado-dia" class="w-full flex-1 grid gap-1.5">
+          <!-- Botones inyectados dinámicamente -->
+        </div>
+
+        <!-- SELECTOR DE POSICIÓN DE LLAVE -->
+        <div class="mt-2 bg-slate-900 p-2 rounded border border-slate-700">
+          <div class="text-[11px] font-bold text-slate-300 mb-1 flex justify-between items-center">
+            <span>Selector de Llave / Posición:</span>
+            <span id="lbl-posicion" class="text-amber-400 font-mono">Posición 1 (Facturación)</span>
+          </div>
+          <div class="grid grid-cols-5 gap-1 text-[10px] font-bold font-mono">
+            <button onclick="setPosicion(0)" id="pos-0" class="py-1 rounded bg-slate-800 border border-slate-600 text-slate-400 hover:bg-slate-700">0: Alta/Baja</button>
+            <button onclick="setPosicion(1)" id="pos-1" class="py-1 rounded bg-amber-600 border border-amber-500 text-white">1: Facturar</button>
+            <button onclick="setPosicion(2)" id="pos-2" class="py-1 rounded bg-slate-800 border border-slate-600 text-slate-400 hover:bg-slate-700">2: Retirada</button>
+            <button onclick="setPosicion(3)" id="pos-3" class="py-1 rounded bg-slate-800 border border-slate-600 text-slate-400 hover:bg-slate-700">3: Cierre</button>
+            <button onclick="setPosicion(4)" id="pos-4" class="py-1 rounded bg-slate-800 border border-slate-600 text-slate-400 hover:bg-slate-700">4: Jef@ Zona</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL DE CAMBIO -->
+  <div id="modal-cambio" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border-2 border-slate-600 rounded-xl max-w-lg w-full p-5 shadow-2xl text-slate-100">
+      
+      <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+        <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2">
+          <span>💵 Entregar Cambio en Efectivo</span>
+        </h3>
+        <span class="text-xs font-mono bg-slate-700 px-2 py-1 rounded text-slate-300">Cobro Ef.</span>
+      </div>
+
+      <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 mb-4 font-mono text-sm space-y-1">
+        <div class="flex justify-between">
+          <span class="text-slate-400">Total Ticket:</span>
+          <span id="m-total" class="font-bold text-white">0,00 €</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Entregado por cliente:</span>
+          <span id="m-entregado" class="font-bold text-green-400">0,00 €</span>
+        </div>
+        <div class="flex justify-between text-base border-t border-slate-800 pt-1 mt-1">
+          <span class="text-amber-400 font-bold">CAMBIO DEBIDO:</span>
+          <span id="m-cambio-debido" class="font-extrabold text-amber-400">0,00 €</span>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-300 mb-2 font-semibold">Selecciona billetes/monedas a entregar:</p>
+      
+      <div id="desglose-dinero" class="grid grid-cols-4 gap-2 mb-4">
+        <!-- Generado por JS -->
+      </div>
+
+      <div class="bg-slate-950 p-2.5 rounded border border-slate-800 mb-4 flex justify-between items-center font-mono text-sm">
+        <span class="text-slate-400">Llevas entregado:</span>
+        <span id="m-llevas-entregado" class="text-xl font-bold text-amber-300">0,00 €</span>
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="resetCambio()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded font-bold text-sm transition">
+          Reiniciar
+        </button>
+        <button onclick="confirmarCambio()" class="flex-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2 px-4 rounded text-sm transition">
+          CONFIRMAR CAMBIO
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const PRODUCTOS = [
+      { c: '1001', n: 'Leche Entera Dia 1L', p: 0.89 },
+      { c: '1002', n: 'Pan de Molde Familiar', p: 1.29, promo: true },
+      { c: '1003', n: 'Huevos Camperos x12', p: 2.45 },
+      { c: '1004', n: 'Aceite Oliva Virgen Extra 1L', p: 7.99, promo: true },
+      { c: '1005', n: 'Arroz Largo Dia 1kg', p: 1.15 },
+      { c: '1006', n: 'Agua Mineral 1.5L', p: 0.32 },
+      { c: '1007', n: 'Yogur Natural Dia x4', p: 0.99, promo: true },
+      { c: '1008', n: 'Café Molido Mezcla 250g', p: 2.79 },
+      { c: '1009', n: 'Galletas María 800g', p: 1.49 },
+      { c: '1010', n: 'Detergente Gel Ropa 3L', p: 5.95, promo: true },
+      { c: '1011', n: 'Papel Higiénico 2 capas x6', p: 2.89 },
+      { c: '1012', n: 'Atún Claro en Aceite x3', p: 2.99 },
+      { c: '1013', n: 'Cerveza Lager Pack 6', p: 3.60 },
+      { c: '1014', n: 'Tomate Frito Estilo Casero', p: 0.85 }
+    ];
+
+    const FRUTAS = [
+      { c: '21', n: 'Plátano de Canarias', p: 1.99 },
+      { c: '22', n: 'Manzana Golden', p: 2.29 },
+      { c: '23', n: 'Tomate Ensalada', p: 2.49 },
+      { c: '24', n: 'Naranja para Zumo', p: 1.39 },
+      { c: '25', n: 'Patata Lavada 1kg', p: 1.19 }
+    ];
+
+    const MONEDAS = [50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01];
+
+    let stats = { clientes: 0, puntos: 0, errores: 0 };
+    let clienteActual = null;
+    let lineasTicket = [];
+    let bufferNum = '';
+    let cantidadMultiplier = 1;
+    let tarjetaClubAplicada = false;
+    let faseCobro = 'scan';
+    let lineaSeleccionada = -1;
+    let itemEnBascula = null;
+    let cambioDebido = 0;
+    let cambioEntregado = 0;
+    let modoTeclado = 'nuevo';
+    let posicionLlave = 1;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playBeep(freq = 1200, duration = 0.08, type = 'sine') {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e){}
+    }
+
+    function playErrorSound() { playBeep(300, 0.2, 'sawtooth'); }
+
+    const formatEur = n => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+    const round2 = n => Math.round(n * 100) / 100;
+
+    // IMAGEN 1: TECLADO TÁCTIL DIA
+    const LAYOUT_NUEVO = [
+      { t: 'CONSULTA DE ARTÍCULOS', cls: 'key-yellow text-[10px]', k: 'CONSULTA' },
+      { t: 'VALES DIA\nANU. DESC. EMPL', cls: 'key-yellow text-[9px]', k: 'VALES_DIA' },
+      { t: 'OTROS\nVALES\nROBOS', cls: 'key-pink text-[9px]', k: 'OTROS_VALES' },
+      { t: 'PAGO TARJETA\nREIMP. CUPONES\nCAMBIO TIENDA REV', cls: 'key-yellow text-[8px]', k: 'TARJETA' },
+      { t: 'FINALIZAR\nPREFIDELIZAR', cls: 'key-yellow text-[9px]', k: 'PREFIDELIZAR' },
+      { t: 'BOLSA', cls: 'key-pink text-xs font-bold', k: 'BOLSA', colSpan: 2 },
+      { t: 'ALTA/BAJA\nCAJERA\nFACTURAR\nBORRAR', cls: 'key-yellow text-[8px]', k: 'ALTA_BAJA' },
+
+      { t: 'GESTIÓN PEDIDOS\nY GESTIÓN MOV.STOCK', cls: 'key-gray text-[8px]', k: 'PEDIDOS' },
+      { t: 'CONTEOS', cls: 'key-gray text-[10px]', k: 'CONTEOS' },
+      { t: 'C', cls: 'key-gray key-num font-bold', k: 'CLEAR' },
+      { t: '7\n_ ()&#', cls: 'key-gray key-num font-bold', k: '7' },
+      { t: '8\nABC', cls: 'key-gray key-num font-bold', k: '8' },
+      { t: '9\nDEF', cls: 'key-gray key-num font-bold', k: '9' },
+      { t: 'NO', cls: 'key-yellow text-base font-bold', k: 'NO' },
+      { t: 'ANULAR', cls: 'key-yellow text-xs font-bold', k: 'ANULAR' },
+      { t: 'CAMBIO\nFORMA PAGO', cls: 'key-yellow text-xs font-bold', k: 'CAMBIO_PAGO', colSpan: 2, rowSpan: 2 },
+      { t: 'INVENTARIOS\nFUNCIONES INSPECTOR', cls: 'key-gray text-[8px]', k: 'INVENTARIOS' },
+
+      { t: 'RESTAURA LINEA Y PERIFERIA', cls: 'key-yellow text-[8px]', k: 'RESTAURA' },
+      { t: 'TRANSP. BLINDADOS\nING. BANCO', cls: 'key-gray text-[8px]', k: 'BLINDADOS' },
+      { t: 'CAN TEMPORAL\nDIARIO ELECTRO-NICO', cls: 'key-gray text-[8px]', k: 'CAN_TEMP' },
+      { t: '4\nGHI', cls: 'key-gray key-num font-bold', k: '4' },
+      { t: '5\nJKL', cls: 'key-gray key-num font-bold', k: '5' },
+      { t: '6\nMNO', cls: 'key-gray key-num font-bold', k: '6' },
+      { t: 'X', cls: 'key-yellow text-xl font-extrabold', k: 'X', rowSpan: 2 },
+      { t: 'FUNCIONES DE ENCARGADA', cls: 'key-gray text-[8px]', k: 'ENCARGADA' },
+
+      { t: 'FACTURAS', cls: 'key-pink text-[10px]', k: 'FACTURAS' },
+      { t: 'ETIQUETAS\nPAGOS COBROS', cls: 'key-gray text-[8px]', k: 'ETIQUETAS' },
+      { t: 'FIN DIA\nCIER. CAJA\nDESCANSO', cls: 'key-gray text-[8px]', k: 'FIN_DIA' },
+      { t: '1\nPQRS', cls: 'key-gray key-num font-bold', k: '1' },
+      { t: '2\nTUV', cls: 'key-gray key-num font-bold', k: '2' },
+      { t: '3\nWXYZ', cls: 'key-gray key-num font-bold', k: '3' },
+      { t: 'TOTAL', cls: 'key-yellow text-xl font-black', k: 'TOTAL', colSpan: 2, rowSpan: 2 },
+      { t: 'CAJÓN', cls: 'key-pink text-xs font-bold', k: 'CAJON' },
+
+      { t: 'RETIRADAS\nCUPONES', cls: 'key-yellow text-[9px]', k: 'RETIRADAS' },
+      { t: '0\n$%+=/', cls: 'key-gray key-num font-bold', k: '0', colSpan: 2 },
+      { t: ',\n.+-*', cls: 'key-gray key-num font-bold', k: ',' },
+      { t: 'SI', cls: 'key-yellow text-xl font-bold', k: 'SI' }
+    ];
+
+    // IMAGEN 2: TECLADO FÍSICO POS DIA
+    const LAYOUT_ANTIGUO = [
+      { t: 'CONSULTA', cls: 'key-green text-xs', k: 'CONSULTA' },
+      { t: 'VALES\nDIA', cls: 'key-yellow text-xs', k: 'VALES_DIA' },
+      { t: 'OTROS\nVALES\nROBOS', cls: 'key-yellow text-[9px]', k: 'OTROS_VALES' },
+      { t: 'PAGO\nTARJETA', cls: 'key-yellow text-xs', k: 'TARJETA' },
+      { t: 'ESCALON', cls: 'key-yellow text-xs', k: 'ESCALON' },
+      { t: 'MOVILES', cls: 'key-yellow text-xs', k: 'MOVILES' },
+      { t: 'BOLSA', cls: 'key-yellow text-xs', k: 'BOLSA' },
+      { t: 'ALTA/BAJA\nCAJERO', cls: 'key-blue text-[9px]', k: 'ALTA_BAJA' },
+
+      { t: 'PEDIDOS', cls: 'key-gray text-xs', k: 'PEDIDOS' },
+      { t: 'DEVOLUCION', cls: 'key-gray text-xs', k: 'DEVOLUCION' },
+      { t: 'C', cls: 'key-red text-xl font-bold', k: 'CLEAR' },
+      { t: '7\n0 &#', cls: 'key-gray key-num font-bold', k: '7' },
+      { t: '8\nABC', cls: 'key-gray key-num font-bold', k: '8' },
+      { t: '9\nDEF', cls: 'key-gray key-num font-bold', k: '9' },
+      { t: 'NO', cls: 'key-red text-xl font-bold', k: 'NO', rowSpan: 2 },
+      { t: 'SOLAPE\nCAMBIO\nFORMA DE PAGO', cls: 'key-yellow text-[8px]', k: 'SOLAPE' },
+      { t: 'JEFE ZONA\nSERVICIO A DOMICILIO', cls: 'key-gray text-[8px]', k: 'JEFE_ZONA' },
+
+      { t: 'RESTAURAR\nLINEA\nPERIFERIA', cls: 'key-gray text-[8px]', k: 'RESTAURA' },
+      { t: 'TRANSPORTES\nBLINDADOS', cls: 'key-gray text-[8px]', k: 'BLINDADOS' },
+      { t: 'EAN\nTEMPORAL', cls: 'key-gray text-[9px]', k: 'CAN_TEMP' },
+      { t: '4\nGHI', cls: 'key-gray key-num font-bold', k: '4' },
+      { t: '5\nJKL', cls: 'key-gray key-num font-bold', k: '5' },
+      { t: '6\nMNO', cls: 'key-gray key-num font-bold', k: '6' },
+      { t: 'X', cls: 'key-gray text-xl font-bold', k: 'X' },
+      { t: 'ANULAR\nARTICULO', cls: 'key-red text-xs font-bold', k: 'ANULAR' },
+      { t: 'JEFE TIENDA\nFORZAR IMPRESION\nANULAR TICKET', cls: 'key-gray text-[7px]', k: 'JEFE_TIENDA' },
+
+      { t: 'FACTURAS', cls: 'key-gray text-xs', k: 'FACTURAS' },
+      { t: 'PAGOS\nROBOS\nVALES', cls: 'key-gray text-[9px]', k: 'PAGOS_ROBOS' },
+      { t: 'FIN DIA\nCIERRE\nDESCANSO', cls: 'key-blue text-[8px]', k: 'FIN_DIA' },
+      { t: '1\nPQRS', cls: 'key-gray key-num font-bold', k: '1' },
+      { t: '2\nTUV', cls: 'key-gray key-num font-bold', k: '2' },
+      { t: '3\nWXYZ', cls: 'key-gray key-num font-bold', k: '3' },
+      { t: 'SI', cls: 'key-green text-xl font-bold', k: 'SI', rowSpan: 2 },
+      { t: 'TOTAL', cls: 'key-blue text-xl font-bold', k: 'TOTAL', colSpan: 2, rowSpan: 2 },
+      { t: 'ABRIR\nCAJON', cls: 'key-gray text-[9px]', k: 'CAJON' },
+
+      { t: 'RETIRADAS', cls: 'key-gray text-xs', k: 'RETIRADAS' },
+      { t: '0\n$%+=/', cls: 'key-gray key-num font-bold', k: '0', colSpan: 2 },
+      { t: ',\n.+-*', cls: 'key-gray key-num font-bold', k: ',' }
+    ];
+
+    window.onload = () => {
+      renderPluTable();
+      renderTeclado();
+      nuevoCliente();
+      setInterval(() => {
+        const d = new Date();
+        document.getElementById('tpv-hora').textContent = d.toLocaleTimeString('es-ES');
+      }, 1000);
+    };
+
+    function renderPluTable() {
+      const tbody = document.getElementById('cuerpo-plu');
+      tbody.innerHTML = FRUTAS.map(f => `
+        <tr class="hover:bg-slate-700/50">
+          <td class="py-1 px-1 font-bold text-amber-400">${f.c}</td>
+          <td class="py-1 px-1">${f.n}</td>
+          <td class="py-1 px-1 text-right text-emerald-400">${formatEur(f.p)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function cambiarModoTeclado(modo) {
+      modoTeclado = modo;
+      document.getElementById('titulo-teclado').textContent = 
+        modo === 'nuevo' ? 'Teclado Dia (Sistema Nuevo Táctil - Imagen 1)' : 'Teclado Dia (Sistema POS Antiguo - Imagen 2)';
+      renderTeclado();
+    }
+
+    function renderTeclado() {
+      const container = document.getElementById('teclado-dia');
+      const layout = modoTeclado === 'nuevo' ? LAYOUT_NUEVO : LAYOUT_ANTIGUO;
+      
+      container.style.gridTemplateColumns = 'repeat(9, 1fr)';
+      container.innerHTML = '';
+
+      layout.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = `btn-key ${item.cls}`;
+        btn.innerText = item.t;
+        
+        if (item.colSpan) btn.style.gridColumn = `span ${item.colSpan}`;
+        if (item.rowSpan) btn.style.gridRow = `span ${item.rowSpan}`;
+
+        btn.onclick = () => presionarTecla(item.k);
+        container.appendChild(btn);
+      });
+    }
+
+    function nuevoCliente() {
+      lineasTicket = [];
+      bufferNum = '';
+      cantidadMultiplier = 1;
+      tarjetaClubAplicada = false;
+      faseCobro = 'scan';
+      lineaSeleccionada = -1;
+      itemEnBascula = null;
+
+      const numArticulos = 3 + Math.floor(Math.random() * 5);
+      const items = [];
+
+      for (let i = 0; i < numArticulos; i++) {
+        if (Math.random() < 0.25) {
+          const f = FRUTAS[Math.floor(Math.random() * FRUTAS.length)];
+          items.push({ ...f, peso: round2(0.3 + Math.random() * 1.7), esFruta: true, id: Date.now() + i });
+        } else {
+          const p = PRODUCTOS[Math.floor(Math.random() * PRODUCTOS.length)];
+          items.push({ ...p, esFruta: false, id: Date.now() + i });
+        }
+      }
+
+      const nombres = ['Carmen G.', 'Manuel R.', 'Lucía M.', 'Antonio P.', 'Elena S.', 'Javier T.'];
+      const tieneClub = Math.random() < 0.6;
+      const pagoForma = Math.random() < 0.55 ? 'efectivo' : 'tarjeta';
+
+      clienteActual = {
+        nombre: nombres[Math.floor(Math.random() * nombres.length)],
+        items,
+        tieneClub,
+        pagoForma
+      };
+
+      document.getElementById('nombre-cliente').textContent = clienteActual.nombre;
+      document.getElementById('estado-cliente').textContent = `Pago: ${pagoForma.toUpperCase()} | Club: ${tieneClub ? 'SÍ' : 'NO'}`;
+      
+      hablarCliente(`¡Buenos días! ${tieneClub ? 'Tengo la tarjeta Club Dia 💳' : ''}`);
+      setMensaje('Nuevo cliente preparado. Escanea los productos de la cinta.', 'info');
+      
+      actualizarPantallaTPV();
+      renderCinta();
+    }
+
+    function hablarCliente(texto) {
+      document.getElementById('bocadillo').innerHTML = `<b>${clienteActual.nombre}:</b> "${texto}"`;
+    }
+
+    function setMensaje(msg, tipo = 'info') {
+      const el = document.getElementById('msg-sistema');
+      el.innerHTML = `<span>${msg}</span>`;
+      if (tipo === 'ok') {
+        el.className = 'mt-2 p-2 rounded text-xs font-semibold border bg-emerald-950/80 border-emerald-700 text-emerald-200';
+      } else if (tipo === 'err') {
+        el.className = 'mt-2 p-2 rounded text-xs font-semibold border bg-rose-950/80 border-rose-700 text-rose-200';
+      } else {
+        el.className = 'mt-2 p-2 rounded text-xs font-semibold border bg-slate-900 border-slate-700 text-slate-300';
+      }
+    }
+
+    function renderCinta() {
+      const cinta = document.getElementById('cinta');
+      cinta.innerHTML = '';
+      document.getElementById('cant-restante').textContent = `${clienteActual.items.length} art.`;
+
+      clienteActual.items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = `p-2 rounded border cursor-pointer text-xs flex flex-col justify-between w-28 h-20 transition-all transform hover:scale-105 ${
+          item.esFruta ? 'bg-emerald-950 border-emerald-700 text-emerald-100' : 'bg-slate-800 border-slate-600 text-slate-100'
+        }`;
+        
+        div.innerHTML = `
+          <div class="font-bold truncate text-[11px]">${item.n}</div>
+          <div class="text-[10px] text-slate-400 font-mono">
+            ${item.esFruta ? `⚖️ ${item.peso.toFixed(3)} kg` : `EAN: ${item.c}`}
+          </div>
+          <div class="text-right font-bold text-amber-400 text-xs">${formatEur(item.esFruta ? item.p * item.peso : item.p)}</div>
+        `;
+
+        div.onclick = () => escanearItem(item);
+        cinta.appendChild(div);
+      });
+    }
+
+    function escanearItem(item) {
+      if (posicionLlave !== 1) {
+        playErrorSound();
+        setMensaje('❌ La llave debe estar en Posición 1 (Facturación) para escanear.', 'err');
+        return;
+      }
+
+      if (faseCobro !== 'scan') {
+        playErrorSound();
+        setMensaje('⚠️ La venta ya está en fase de pago. Pulsa TOTAL o cobra.', 'err');
+        return;
+      }
+
+      if (item.esFruta) {
+        itemEnBascula = item;
+        playBeep(900, 0.05);
+        setMensaje(`⚖️ Producto en báscula: ${item.n} (${item.peso.toFixed(3)}kg). Teclea el PLU (${item.c}) y pulsa SI.`, 'info');
+        actualizarDisplay();
+        return;
+      }
+
+      let cant = cantidadMultiplier;
+      const coincidentes = clienteActual.items.filter(x => x.c === item.c);
+
+      if (cant > coincidentes.length) {
+        stats.errores++;
+        playErrorSound();
+        setMensaje(`❌ Error: Has marcado ${cant} unidades, pero solo hay ${coincidentes.length} en la cinta.`, 'err');
+        cantidadMultiplier = 1;
+        actualizarDisplay();
+        return;
+      }
+
+      coincidentes.slice(0, cant).forEach(x => {
+        const idx = clienteActual.items.indexOf(x);
+        if (idx > -1) clienteActual.items.splice(idx, 1);
+      });
+
+      const totalLinea = round2(item.p * cant);
+      lineasTicket.push({
+        n: item.n,
+        q: cant,
+        p: item.p,
+        t: totalLinea,
+        promo: item.promo || false,
+        anulada: false,
+        c: item.c
+      });
+
+      playBeep(1800, 0.08);
+      cantidadMultiplier = 1;
+      bufferNum = '';
+      lineaSeleccionada = lineasTicket.length - 1;
+
+      setMensaje(`✔ Añadido: ${item.n} ${cant > 1 ? `(x${cant})` : ''}`, 'ok');
+      renderCinta();
+      actualizarPantallaTPV();
+    }
+
+    const calcBruto = () => round2(lineasTicket.filter(l => !l.anulada).reduce((s, l) => s + l.t, 0));
+    const calcDescuento = () => tarjetaClubAplicada ? round2(lineasTicket.filter(l => !l.anulada && l.promo).reduce((s, l) => s + l.t * 0.10, 0)) : 0;
+    const calcTotal = () => round2(calcBruto() - calcDescuento());
+
+    function actualizarPantallaTPV() {
+      const visor = document.getElementById('pantalla-tpv');
+      visor.innerHTML = '';
+
+      if (lineasTicket.length === 0) {
+        visor.innerHTML = `<div class="text-slate-500 text-xs italic text-center py-6">Pasar artículos por el escáner...</div>`;
+      } else {
+        lineasTicket.forEach((l, i) => {
+          const div = document.createElement('div');
+          div.className = `flex justify-between items-center py-0.5 px-1 rounded cursor-pointer ${
+            i === lineaSeleccionada ? 'bg-blue-800 text-white font-bold' : ''
+          } ${l.anulada ? 'line-through text-red-400 opacity-60' : ''}`;
+
+          div.onclick = () => { lineaSeleccionada = i; actualizarPantallaTPV(); };
+
+          div.innerHTML = `
+            <span>${l.q > 1 ? l.q + ' x ' : ''}${l.n}${l.kg ? ' ' + l.kg.toFixed(3) + 'kg' : ''}</span>
+            <span>${formatEur(l.t)}</span>
+          `;
+          visor.appendChild(div);
+        });
+      }
+
+      if (tarjetaClubAplicada) {
+        const divClub = document.createElement('div');
+        divClub.className = 'flex justify-between items-center text-emerald-400 font-bold border-t border-blue-900 pt-1 mt-1';
+        divClub.innerHTML = `<span>DESCUENTO CLUB DIA (10%)</span><span>-${formatEur(calcDescuento())}</span>`;
+        visor.appendChild(divClub);
+      }
+
+      visor.scrollTop = visor.scrollHeight;
+
+      document.getElementById('num-lineas').textContent = lineasTicket.filter(l => !l.anulada).length;
+      document.getElementById('val-descuento').textContent = formatEur(calcDescuento());
+      document.getElementById('total-tpv').textContent = formatEur(calcTotal());
+      document.getElementById('stats').textContent = `Clientes: ${stats.clientes} | Puntos: ${stats.puntos} | Errores: ${stats.errores}`;
+
+      actualizarDisplay();
+    }
+
+    function actualizarDisplay() {
+      const dNum = document.getElementById('display-num');
+      const dInfo = document.getElementById('display-info');
+
+      dNum.textContent = (cantidadMultiplier > 1 ? `${cantidadMultiplier} X ` : '') + bufferNum;
+      
+      if (itemEnBascula) {
+        dInfo.textContent = `BÁSCULA: ${itemEnBascula.n} (${itemEnBascula.peso.toFixed(3)}kg)`;
+      } else {
+        dInfo.textContent = faseCobro === 'scan' ? 'ESCANEO DE ARTÍCULOS' : 'FASE DE COBRO';
+      }
+    }
+
+    function setPosicion(pos) {
+      posicionLlave = pos;
+      for (let i = 0; i <= 4; i++) {
+        const b = document.getElementById(`pos-${i}`);
+        if (i === pos) {
+          b.className = 'py-1 rounded bg-amber-600 border border-amber-500 text-white font-bold';
+        } else {
+          b.className = 'py-1 rounded bg-slate-800 border border-slate-600 text-slate-400 hover:bg-slate-700';
+        }
+      }
+      const nombresPos = ['0 (Alta/Baja Cajera)', '1 (Facturación)', '2 (Retirada Rápida)', '3 (Cierre de Caja)', '4 (Jef@ de Zona)'];
+      document.getElementById('lbl-posicion').textContent = `Posición ${nombresPos[pos]}`;
+      playBeep(600, 0.05);
+    }
+
+    function presionarTecla(k) {
+      playBeep(1200, 0.03);
+
+      if (/^\d+$/.test(k) || k === ',') {
+        bufferNum += k;
+        actualizarDisplay();
+        return;
+      }
+
+      switch (k) {
+        case 'CLEAR':
+          bufferNum = '';
+          cantidadMultiplier = 1;
+          setMensaje('Borrado de entrada.', 'info');
+          actualizarDisplay();
+          break;
+
+        case 'X':
+          if (!bufferNum) {
+            playErrorSound();
+            setMensaje('⚠️ Teclea primero la cantidad y luego pulsa X.', 'err');
+            return;
+          }
+          cantidadMultiplier = parseInt(bufferNum);
+          bufferNum = '';
+          setMensaje(`Multiplicador fijado en ${cantidadMultiplier} unidades. Escanea el artículo.`, 'info');
+          actualizarDisplay();
+          break;
+
+        case 'VALES_DIA':
+          if (faseCobro !== 'scan') {
+            setMensaje('⚠️ La tarjeta Club Dia se pasa antes del TOTAL.', 'err');
+            return;
+          }
+          if (!clienteActual.tieneClub) {
+            stats.errores++;
+            playErrorSound();
+            setMensaje('❌ Este cliente NO tiene tarjeta Club Dia.', 'err');
+            return;
+          }
+          tarjetaClubAplicada = true;
+          playBeep(2000, 0.15);
+          setMensaje('✔ Tarjeta Club Dia leída. Descuentos aplicados.', 'ok');
+          actualizarPantallaTPV();
+          break;
+
+        case 'ANULAR':
+          if (lineaSeleccionada < 0 || !lineasTicket[lineaSeleccionada] || lineasTicket[lineaSeleccionada].anulada) {
+            playErrorSound();
+            setMensaje('⚠️ Selecciona una línea activa del ticket para anular.', 'err');
+            return;
+          }
+          lineasTicket[lineaSeleccionada].anulada = true;
+          setMensaje(`✔ Línea "${lineasTicket[lineaSeleccionada].n}" anulada.`, 'ok');
+          actualizarPantallaTPV();
+          break;
+
+        case 'SI':
+          if (itemEnBascula) {
+            if (bufferNum !== itemEnBascula.c) {
+              stats.errores++;
+              playErrorSound();
+              setMensaje(`❌ PLU incorrecto (${bufferNum}). Revisa la tabla de Fruta (${itemEnBascula.c}).`, 'err');
+              bufferNum = '';
+              actualizarDisplay();
+              return;
+            }
+
+            const item = itemEnBascula;
+            const totalPeso = round2(item.p * item.peso);
+            
+            lineasTicket.push({
+              n: item.n,
+              kg: item.peso,
+              p: item.p,
+              t: totalPeso,
+              anulada: false,
+              c: item.c
+            });
+
+            const idx = clienteActual.items.indexOf(item);
+            if (idx > -1) clienteActual.items.splice(idx, 1);
+
+            itemEnBascula = null;
+            bufferNum = '';
+            lineaSeleccionada = lineasTicket.length - 1;
+            
+            playBeep(1600, 0.1);
+            setMensaje(`✔ ${item.n} pesado correctamente.`, 'ok');
+            renderCinta();
+            actualizarPantallaTPV();
+            return;
+          }
+          break;
+
+        case 'TOTAL':
+        case 'CAMBIO_PAGO':
+        case 'SOLAPE':
+          if (clienteActual.items.length > 0) {
+            setMensaje('⚠️ Aún quedan productos en la cinta transportadora.', 'err');
+            playErrorSound();
+            return;
+          }
+          if (!lineasTicket.some(l => !l.anulada)) {
+            setMensaje('⚠️ No hay ningún producto activo en el ticket.', 'err');
+            playErrorSound();
+            return;
+          }
+          if (clienteActual.tieneClub && !tarjetaClubAplicada) {
+            stats.errores++;
+            playErrorSound();
+            setMensaje('❌ ¡El cliente te dijo que tenía Club Dia! Has olvidado pasarlo.', 'err');
+          }
+
+          faseCobro = 'pay';
+          const t = calcTotal();
+
+          if (clienteActual.pagoForma === 'tarjeta') {
+            hablarCliente(`Son ${formatEur(t)}. Pago con tarjeta de crédito.`);
+            setMensaje('Cliente listo para pagar con TARJETA. Pulsa PAGO TARJETA.', 'info');
+          } else {
+            const opciones = [5, 10, 20, 50, 100].filter(b => b >= t);
+            clienteActual.entrega = Math.random() < 0.3 ? t : (opciones[0] || Math.ceil(t / 10) * 10);
+            hablarCliente(`Te entrego ${formatEur(clienteActual.entrega)} en efectivo.`);
+            setMensaje(`Cliente entrega ${formatEur(clienteActual.entrega)}. Teclea la cantidad dada y pulsa SI.`, 'info');
+          }
+          actualizarPantallaTPV();
+          break;
+
+        case 'TARJETA':
+          if (faseCobro !== 'pay') {
+            setMensaje('⚠️ Pulsa TOTAL primero para calcular el importe.', 'err');
+            return;
+          }
+          if (clienteActual.pagoForma !== 'tarjeta') {
+            stats.errores++;
+            playErrorSound();
+            setMensaje('❌ El cliente desea pagar en EFECTIVO, no con tarjeta.', 'err');
+            return;
+          }
+          finalizarVenta('Pago con tarjeta ACEPTADO ✔');
+          break;
+
+        case 'CAJON':
+          playBeep(400, 0.2);
+          setMensaje('🔓 Cajón portamonedas abierto.', 'info');
+          break;
+
+        default:
+          setMensaje(`Tecla "${k}" pulsada.`, 'info');
+          break;
+      }
+    }
+
+    function abrirModalCambio(entregaCajero) {
+      const t = calcTotal();
+      if (round2(entregaCajero) !== clienteActual.entrega) {
+        stats.errores++;
+        playErrorSound();
+        setMensaje(`❌ Te equivocas al teclear: El cliente ha entregado ${formatEur(clienteActual.entrega)}, no ${formatEur(entregaCajero)}.`, 'err');
+        bufferNum = '';
+        actualizarDisplay();
+        return;
+      }
+
+      cambioDebido = round2(entregaCajero - t);
+      cambioEntregado = 0;
+
+      if (cambioDebido === 0) {
+        finalizarVenta('Pago en efectivo EXACTO ✔');
+        return;
+      }
+
+      document.getElementById('m-total').textContent = formatEur(t);
+      document.getElementById('m-entregado').textContent = formatEur(entregaCajero);
+      document.getElementById('m-cambio-debido').textContent = formatEur(cambioDebido);
+      document.getElementById('m-llevas-entregado').textContent = formatEur(0);
+
+      const gridDinero = document.getElementById('desglose-dinero');
+      gridDinero.innerHTML = '';
+
+      MONEDAS.forEach(val => {
+        const b = document.createElement('button');
+        b.className = `p-2 rounded font-mono font-bold text-xs border ${
+          val >= 5 ? 'bg-emerald-950 border-emerald-700 text-emerald-200' : 'bg-amber-950 border-amber-700 text-amber-200'
+        } hover:brightness-125`;
+        b.textContent = val >= 1 ? `${val} €` : `${Math.round(val * 100)} c`;
+        b.onclick = () => {
+          cambioEntregado = round2(cambioEntregado + val);
+          document.getElementById('m-llevas-entregado').textContent = formatEur(cambioEntregado);
+          playBeep(1000, 0.04);
+        };
+        gridDinero.appendChild(b);
+      });
+
+      document.getElementById('modal-cambio').style.display = 'flex';
+    }
+
+    function resetCambio() {
+      cambioEntregado = 0;
+      document.getElementById('m-llevas-entregado').textContent = formatEur(0);
+    }
+
+    function confirmarCambio() {
+      if (cambioEntregado !== cambioDebido) {
+        stats.errores++;
+        playErrorSound();
+        alert(`❌ Debías entregar ${formatEur(cambioDebido)} y has contado ${formatEur(cambioEntregado)}.`);
+        resetCambio();
+        return;
+      }
+
+      document.getElementById('modal-cambio').style.display = 'none';
+      finalizarVenta(`Cambio entregado correctamente: ${formatEur(cambioDebido)} ✔`);
+    }
+
+    function finalizarVenta(msgExito) {
+      stats.clientes++;
+      stats.puntos += 10 + lineasTicket.length * 2;
+      faseCobro = 'fin';
+
+      hablarCliente('¡Muchas gracias por todo! Hasta luego. 👋');
+      setMensaje(`${msgExito} — Pulsa "Siguiente Cliente".`, 'ok');
+      playBeep(1500, 0.2);
+      actualizarPantallaTPV();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (document.getElementById('modal-cambio').style.display === 'flex') return;
+
+      if (/^[0-9,]$/.test(e.key)) {
+        presionarTecla(e.key);
+      } else if (e.key === 'Enter') {
+        if (faseCobro === 'pay' && clienteActual.pagoForma === 'efectivo' && bufferNum !== '') {
+          abrirModalCambio(parseFloat(bufferNum.replace(',', '.')));
+        } else {
+          presionarTecla('SI');
+        }
+      } else if (e.key === 'Escape' || e.key === 'Backspace') {
+        presionarTecla('CLEAR');
+      } else if (e.key === '*') {
+        presionarTecla('X');
+      } else if (e.key === '+') {
+        presionarTecla('TOTAL');
+      }
+    });
+  </script>
+</body>
+</html>
